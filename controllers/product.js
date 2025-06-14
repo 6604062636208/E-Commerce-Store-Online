@@ -16,16 +16,16 @@ exports.create = async (req, res) => {
         quantity: parseInt(quantity),
         categoryId: parseInt(categoryId),
         images: {
-          create: images.map((item) => {
-            asset_id: item.asset_id;
-            public_id: item.public_id;
-            url: item.url;
-            secure_url: item.secure_url;
-          }),
+          create: images.map((item) => ({
+            asset_id: item.asset_id,
+            public_id: item.public_id,
+            url: item.url,
+            secure_url: item.secure_url,
+          })),
         },
       },
     });
-    res.send("Hello Create Product");
+    res.send(product);
   } catch (error) {
     console.log(error);
     res.status(500).json({
@@ -37,7 +37,38 @@ exports.create = async (req, res) => {
 exports.list = async (req, res) => {
   try {
     // code
-    res.send("Hello List Product");
+    const { count } = req.params;
+    const products = await prisma.product.findMany({
+      take: parseInt(count),
+      orderBy: { createdAt: "desc" },
+      include: {
+        category: true,
+        images: true,
+      },
+    });
+    res.send(products);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      message: "Server Error",
+    });
+  }
+};
+
+exports.read = async (req, res) => {
+  try {
+    // code
+    const { id } = req.params;
+    const products = await prisma.product.findFirst({
+      where: {
+        id: Number(id),
+      },
+      include: {
+        category: true,
+        images: true,
+      },
+    });
+    res.send(products);
   } catch (error) {
     console.log(error);
     res.status(500).json({
@@ -48,8 +79,37 @@ exports.list = async (req, res) => {
 
 exports.update = async (req, res) => {
   try {
-    // code
-    res.send("Hello Update Product");
+    const { title, description, price, quantity, categoryId, images } =
+      req.body;
+    // console.log(title, description, price, quantity, images);
+
+    await prisma.image.deleteMany({
+      where: {
+        productId: Number(req.params.id),
+      },
+    });
+
+    const product = await prisma.product.update({
+      where: {
+        id: Number(req.params.id),
+      },
+      data: {
+        title: title,
+        description: description,
+        price: parseFloat(price),
+        quantity: parseInt(quantity),
+        categoryId: parseInt(categoryId),
+        images: {
+          create: images.map((item) => ({
+            asset_id: item.asset_id,
+            public_id: item.public_id,
+            url: item.url,
+            secure_url: item.secure_url,
+          })),
+        },
+      },
+    });
+    res.send(product);
   } catch (error) {
     console.log(error);
     res.status(500).json({
@@ -61,7 +121,14 @@ exports.update = async (req, res) => {
 exports.remove = async (req, res) => {
   try {
     // code
-    res.send("Hello Remove Product");
+    const { id } = req.params;
+    // nungsheevit
+    await prisma.product.delete({
+      where: {
+        id: Number(id),
+      },
+    });
+    res.send("Delete Success");
   } catch (error) {
     console.log(error);
     res.status(500).json({
@@ -73,7 +140,85 @@ exports.remove = async (req, res) => {
 exports.listby = async (req, res) => {
   try {
     // code
-    res.send("Hello ListBy Product");
+    const { sort, order, limit } = req.body;
+    console.log(sort, order, limit);
+    const products = await prisma.product.findMany({
+      take: limit,
+      orderBy: {
+        [sort]: order,
+      },
+      include: {
+        category: true,
+      },
+    });
+    res.send(products);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      message: "Server Error",
+    });
+  }
+};
+
+const handleQuery = async (req, res, query) => {
+  try {
+    //code
+    const products = await prisma.product.findMany({
+      where: {
+        title: {
+          contains: query,
+        },
+      },
+      include: {
+        category: true,
+        images: true,
+      },
+    });
+    res.send(products);
+  } catch (error) {
+    //error
+    console.log(error);
+    res.status(500).json({
+      message: "Search Error",
+    });
+  }
+};
+const handlePrice = async (req, res, priceRange) => {
+  try {
+    const products = await prisma.product.findMany({
+      where: {
+        price: {
+          gte: priceRange[0], // มากกว่า 100
+          lte: priceRange[1], // น้อยกว่า 600
+        },
+      },
+      include: {
+        category: true,
+        images: true,
+      },
+    });
+    res.send(products);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      message: "Server Error",
+    });
+  }
+};
+const handleCategory = async (req, res, categoryId) => {
+  try {
+    const products = await prisma.product.findMany({
+      where: {
+        categoryId: {
+          in: categoryId.map((id) => Number(id)),
+        },
+      },
+      include: {
+        category: true,
+        images: true,
+      },
+    });
+    res.send(products);
   } catch (error) {
     console.log(error);
     res.status(500).json({
@@ -85,7 +230,20 @@ exports.listby = async (req, res) => {
 exports.searchFilters = async (req, res) => {
   try {
     // code
-    res.send("Hello searchFilters Product");
+    const { query, category, price } = req.body;
+    if (query) {
+      console.log("query-->", query);
+      await handleQuery(req, res, query);
+    }
+    if (category) {
+      console.log("category-->", category);
+      await handleCategory(req, res, category);
+    }
+    if (price) {
+      console.log("price-->", price);
+      await handlePrice(req, res, price);
+    }
+    // res.send("Hello searchFilters Product");
   } catch (error) {
     console.log(error);
     res.status(500).json({
